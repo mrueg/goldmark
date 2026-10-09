@@ -118,6 +118,26 @@ func TestDeepNestedLabelPerformance(t *testing.T) {
 	}
 }
 
+func TestManyUnclosedEmphasisPerformance(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping performance test in short mode")
+	}
+	p := parser.New()
+	r := html.New(html.WithXHTML(), html.WithUnsafe())
+
+	for _, c := range []string{"*a ", "_a ", "*a **b "} {
+		started := nowMillis()
+		n := 50000
+		source := []byte(strings.Repeat(c, n))
+		var b bytes.Buffer
+		_ = r.Render(&b, source, p.Parse(source))
+		finished := nowMillis()
+		if (finished - started) > int64(5000*testTimeoutMultiplier) {
+			t.Errorf("Parsing many unclosed emphasis(%q) took too long", c)
+		}
+	}
+}
+
 func TestManyProcessingInstructionPerformance(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")

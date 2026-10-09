@@ -228,9 +228,21 @@ func parseSimpleDelimitedText(block text.Reader, line []byte, segment text.Segme
 
 		// Cheap byte-level pre-filter. `absIdx >= openerLen >= 1`,
 		// so absIdx-1 is always a valid index.
-		if prev := line[absIdx-1]; prev == ' ' || prev == '\t' || prev == '\\' {
+		prev := line[absIdx-1]
+
+		// An escaped delimiter is a part of the content.
+		if prev == '\\' && isEscapedAt(line, openerLen, absIdx) {
 			scanStart = k
 			continue
+		}
+
+		// A delimiter run that can not close our opener would become a part of
+		// the content. The content then contains a delimiter that must be
+		// handled by the slow path. Returning early here also keeps
+		// the scan linear: otherwise every opener would scan up to the end of
+		// the line.
+		if prev == ' ' || prev == '\t' || prev == '\\' {
+			return nil
 		}
 
 		// Strict rune-based flanking.
@@ -241,8 +253,7 @@ func parseSimpleDelimitedText(block text.Reader, line []byte, segment text.Segme
 		}
 		closerCanOpen, closerCanClose := parseDelimiterOpenClose(beforeRune, afterRune, c)
 		if !closerCanClose {
-			scanStart = k
-			continue
+			return nil
 		}
 		// CommonMark Rule 9
 		if (canClose || closerCanOpen) && (openerLen+closerLen)%3 == 0 && closerLen%3 != 0 {
@@ -254,16 +265,26 @@ func parseSimpleDelimitedText(block text.Reader, line []byte, segment text.Segme
 	k := absIdx + closerLen
 
 	// fast path supports only single-text node.
+	// Inline parsers triggered by ' ' are also called at the beginning of the
+	// content and at spaces, see parser.parseBlock.
+	hasSpaceParser := parsers[' '] != nil
+	if hasSpaceParser && charFlags[line[openerLen]]&charFlagPunct == 0 {
+		return nil
+	}
 	for i := openerLen; i < absIdx; i++ {
 		ch := line[i]
 		if ch == '\\' && i+1 < absIdx {
 			i++
+			// escaped spaces may also trigger the parsers
+			if hasSpaceParser && charFlags[line[i]]&charFlagSpace != 0 {
+				return nil
+			}
 			continue
 		}
 		if ch == '\n' {
 			return nil
 		}
-		if parsers[ch] != nil {
+		if parsers[ch] != nil || (hasSpaceParser && charFlags[ch]&charFlagSpace != 0) {
 			return nil
 		}
 	}
@@ -291,6 +312,16 @@ func parseSimpleDelimitedText(block text.Reader, line []byte, segment text.Segme
 	}
 	block.Advance(k)
 	return inner
+}
+
+// isEscapedAt returns true if line[pos] is escaped by an odd number of
+// backslashes that start at or after the given start position.
+func isEscapedAt(line []byte, start, pos int) bool {
+	i := pos - 1
+	for i >= start && line[i] == '\\' {
+		i--
+	}
+	return (pos-1-i)%2 == 1
 }
 
 func parseDelimiterOpenClose(before, after rune, c byte) (canOpen, canClose bool) {

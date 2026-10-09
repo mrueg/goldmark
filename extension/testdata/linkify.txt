@@ -228,3 +228,10 @@ https://example.org/).
 <p>(<a href="https://example.com/a">https://example.com/a</a>&amp;).</p>
 <p>(<a href="https://example.org/path_(x)">https://example.org/path_(x)</a>.)</p>
 //= = = = = = = = = = = = = = = = = = = = = = = =//
+
+22: Linkify inside emphasis
+//- - - - - - - - -//
+*www.example.com* _https://example.com_ **foo@example.com**
+//- - - - - - - - -//
+<p><em><a href="http://www.example.com">www.example.com</a></em> <em><a href="https://example.com">https://example.com</a></em> <strong><a href="mailto:foo@example.com">foo@example.com</a></strong></p>
+//= = = = = = = = = = = = = = = = = = = = = = = =//
