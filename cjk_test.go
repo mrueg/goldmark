@@ -375,3 +375,24 @@ func TestEastAsianLineBreaks(t *testing.T) {
 	)
 
 }
+
+func TestEastAsianLineBreaksInvalidUTF8(t *testing.T) {
+	markdown := testutil.NewMarkdownToStringFunc(
+		parser.New(),
+		html.New(
+			html.WithLineBreakStrategy(html.SimpleEastAsianLineBreakStrategy),
+		),
+	)
+	for i, src := range []string{"\x80\nb", "a\n\x80", "日\n\x80本", "\xbf\xbf\nx"} {
+		testutil.DoTestCase(
+			markdown,
+			testutil.MarkdownTestCase{
+				No:          i + 1,
+				Description: "Invalid UTF-8 around a soft line break must not panic",
+				Markdown:    src,
+				Expected:    "<p>" + src + "</p>",
+			},
+			t,
+		)
+	}
+}

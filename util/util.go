@@ -382,16 +382,20 @@ func ReplaceSpaces(bs []byte, repl byte) []byte {
 	return cob.Bytes()
 }
 
-// ToRune decode given bytes start at pos and returns a rune.
+// ToRune returns the rune that contains the byte at pos.
+// If the byte at pos is not a part of a valid UTF-8 sequence,
+// ToRune returns utf8.RuneError.
 func ToRune(bs []byte, pos int) rune {
-	i := pos
-	for ; i >= 0; i-- {
+	for i := pos; i >= 0 && pos-i < utf8.UTFMax; i-- {
 		if utf8.RuneStart(bs[i]) {
+			r, size := utf8.DecodeRune(bs[i:])
+			if i+size > pos {
+				return r
+			}
 			break
 		}
 	}
-	r, _ := utf8.DecodeRune(bs[i:])
-	return r
+	return utf8.RuneError
 }
 
 // ToValidRune returns 0xFFFD if the given rune is invalid, otherwise v.
